@@ -1,81 +1,230 @@
-# MicroLang Compiler
+# MicroLang
 
-MicroLang is a minimalist language compiler written in Dart. It demonstrates the basic concepts of lexical analysis, parsing, and code generation.
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](licence)
 
-## Features
+A minimalist programming language that compiles to JavaScript. Written in Dart.
 
-- Simple syntax for variable assignment and printing
-- Lexical analysis (tokenization)
-- Abstract Syntax Tree (AST) generation
-- Basic code generation
-- Error handling for common syntax errors
+MicroLang supports **multiple types**, **arithmetic/comparison/logical expressions**, **if/else conditionals**, **while loops**, and **functions with recursion** — all compiled to clean, readable JavaScript.
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
+### Option 1: Download the binary
 
-- Dart SDK (latest version recommended)
-- Visual Studio Code with Dart extension (optional, but recommended)
+Download the latest release from the [Releases](https://github.com/Qharny/MicroLang/releases) page. No Dart SDK required.
 
-### Installation
+```bash
+# Compile a file
+microlang hello.ml
 
-1. Clone this repository or download the source code.
-2. Open the project folder in Visual Studio Code.
-3. Ensure that the Dart SDK is properly set up in your environment.
+# Compile and save output
+microlang hello.ml -o hello.js
 
-### Running the Compiler
+# Interactive mode
+microlang
+```
 
-1. Open a terminal in the project directory.
-2. Run the following command:
+### Option 2: Run with Dart
 
-   ```
-   dart run
-   ```
+```bash
+git clone https://github.com/Qharny/MicroLang.git
+cd MicroLang
+dart pub get
+dart run
+```
 
-3. Enter your MicroLang code when prompted. Type "END" on a new line when you're finished entering code.
-
-## MicroLang Syntax
-
-MicroLang currently supports two types of statements:
-
-1. Variable assignment:
-   ```
-   variable_name = number
-   ```
-
-2. Printing a variable:
-   ```
-   print(variable_name)
-   ```
-
-### Example
+## Language Overview
 
 ```
-x = 5
-print(x)
+// Variables — integers, floats, strings, booleans
+x = 42
+pi = 3.14
+name = "MicroLang"
+active = true
+
+// Expressions with operator precedence
+result = (x + 8) * 2 - pi
+
+// Comparisons and logic
+valid = x > 0 && active
+
+// Print any expression
+print(result)
+print("Hello, World!")
+
+// If / else
+if (x > 50) {
+  print("big")
+} else {
+  print("small")
+}
+
+// While loops
+i = 0
+while (i < 5) {
+  print(i)
+  i = i + 1
+}
+
+// Functions
+fn factorial(n) {
+  if (n <= 1) {
+    return 1
+  } else {
+    return n * factorial(n - 1)
+  }
+}
+
+print(factorial(5))
+```
+
+This compiles to:
+
+```js
+let x = 42;
+let pi = 3.14;
+let name = "MicroLang";
+let active = true;
+let result = ((x + 8) * 2) - pi);
+let valid = ((x > 0) && active);
+console.log(result);
+console.log("Hello, World!");
+if ((x > 50)) {
+  console.log("big");
+} else {
+  console.log("small");
+}
+let i = 0;
+while ((i < 5)) {
+  console.log(i);
+  i = (i + 1);
+}
+function factorial(n) {
+  if ((n <= 1)) {
+    return 1;
+  } else {
+    return (n * factorial((n - 1)));
+  }
+}
+console.log(factorial(5));
+```
+
+## CLI Usage
+
+```
+MicroLang Compiler v2.0.0
+
+Usage:
+  microlang [options] [file.ml]
+  microlang                     Interactive mode (type END to finish)
+  microlang program.ml          Compile a file
+  microlang program.ml -o out.js  Compile to a file
+
+Options:
+  -h, --help       Show usage information
+  -v, --version    Show version
+  -t, --tokens     Print lexer tokens
+  -a, --ast        Print the AST
+  -o, --output     Write generated code to a file
+```
+
+### Examples
+
+```bash
+# Print generated JavaScript to stdout
+microlang examples/hello.ml
+
+# Save to a file and run with Node.js
+microlang examples/functions.ml -o output.js
+node output.js
+
+# Debug: see tokens and AST
+microlang examples/hello.ml --tokens --ast
+```
+
+## Using as a Library
+
+Add MicroLang to your Dart project:
+
+```yaml
+dependencies:
+  microlang:
+    git:
+      url: https://github.com/Qharny/MicroLang.git
+```
+
+```dart
+import 'package:microlang/microlang.dart';
+
+void main() {
+  final compiler = SimpleCompiler();
+
+  final source = 'x = 5\nprint(x + 1)';
+  final tokens = compiler.lexer(source);
+  final ast = compiler.parser(tokens);
+  final js = compiler.codeGenerator(ast);
+
+  print(js);
+  // Output:
+  // let x = 5;
+  // console.log((x + 1));
+}
+```
+
+## Documentation
+
+- **[Language Reference](doc/language_reference.md)** — complete syntax, types, operators, precedence, grammar
+- **[Changelog](CHANGELOG.md)** — version history
+- **[Examples](examples/)** — example programs:
+  - [`hello.ml`](examples/hello.ml) — Hello World
+  - [`variables.ml`](examples/variables.ml) — types and expressions
+  - [`control_flow.ml`](examples/control_flow.ml) — if/else and while loops
+  - [`functions.ml`](examples/functions.ml) — functions and recursion
+
+## Building from Source
+
+### Run tests
+
+```bash
+dart test
+```
+
+### Build standalone executable
+
+```bash
+dart compile exe bin/microlang.dart -o build/microlang.exe
+```
+
+This produces a self-contained binary that can be distributed without the Dart SDK.
+
+### Generate API documentation
+
+```bash
+dart doc
 ```
 
 ## Project Structure
 
-- `main.dart`: Contains the main compiler implementation, including:
-  - `SimpleCompiler` class with lexer, parser, and code generator
-  - Token and AST node definitions
-  - Main function for user interaction
-
-## Limitations
-
-- Only supports integer variables
-- No support for expressions or operations
-- Limited to assignment and print statements
-- No support for control structures or functions
-
-## Future Enhancements
-
-- Add support for arithmetic expressions
-- Implement control structures (if/else, loops)
-- Add function definitions and calls
-- Extend type system to include strings and floating-point numbers
-- Implement a proper symbol table for variable management
+```
+MicroLang/
+├── bin/
+│   └── microlang.dart       # CLI entry point
+├── lib/
+│   └── microlang.dart       # Compiler library (lexer, parser, codegen)
+├── test/
+│   └── microlang_test.dart  # Test suite (44 tests)
+├── examples/
+│   ├── hello.ml             # Hello World
+│   ├── variables.ml         # Types and expressions
+│   ├── control_flow.ml      # If/else and while
+│   └── functions.ml         # Functions and recursion
+├── doc/
+│   └── language_reference.md # Complete language reference
+├── pubspec.yaml
+├── CHANGELOG.md
+├── README.md
+└── licence
+```
 
 ## Contributing
 
@@ -83,4 +232,4 @@ Contributions to MicroLang are welcome! Please feel free to submit pull requests
 
 ## License
 
-This project is open-source and available under the MIT License.
+This project is open-source and available under the [MIT License](licence).

@@ -1,144 +1,127 @@
 import 'dart:io';
+import 'package:args/args.dart';
+import 'package:microlang/microlang.dart';
 
-void main() {
-  final compiler = SimpleCompiler();
-  print('Enter your code (type "END" on a new line to finish):');
-  
-  List<String> lines = [];
-  while (true) {
-    String? line = stdin.readLineSync();
-    if (line == 'END') break;
-    if (line != null) lines.add(line);
-  }
-  
-  String sourceCode = lines.join('\n');
+const String version = '2.0.0';
+
+void main(List<String> arguments) {
+  final argParser = ArgParser()
+    ..addFlag('help', abbr: 'h', negatable: false, help: 'Show usage information')
+    ..addFlag('version', abbr: 'v', negatable: false, help: 'Show version')
+    ..addFlag('tokens', abbr: 't', negatable: false, help: 'Print lexer tokens')
+    ..addFlag('ast', abbr: 'a', negatable: false, help: 'Print the AST')
+    ..addOption('output', abbr: 'o', help: 'Write generated code to a file');
+
+  ArgResults args;
   try {
-    List<Token> tokens = compiler.lexer(sourceCode);
-    print('Tokens: $tokens');
-    
-    List<ASTNode> ast = compiler.parser(tokens);
-    print('AST: $ast');
-    
-    String output = compiler.codeGenerator(ast);
-    print('Generated code:\n$output');
+    args = argParser.parse(arguments);
   } catch (e) {
-    print('Error: $e');
+    stderr.writeln('Error: $e');
+    stderr.writeln();
+    _printUsage(argParser);
+    exit(1);
   }
-}
 
-class SimpleCompiler {
-  List<Token> lexer(String sourceCode) {
-    List<Token> tokens = [];
-    RegExp tokenRegex = RegExp(r'\b(if|else|print)\b|\d+|[a-zA-Z_]\w*|[+\-*/()=]');
-    
-    for (Match match in tokenRegex.allMatches(sourceCode)) {
-      String value = match.group(0)!;
-      TokenType type = _getTokenType(value);
-      tokens.add(Token(type, value));
-    }
-    
-    return tokens;
+  if (args['help'] as bool) {
+    _printUsage(argParser);
+    return;
   }
-  
-  TokenType _getTokenType(String value) {
-    switch (value) {
-      case 'if': return TokenType.IF;
-      case 'else': return TokenType.ELSE;
-      case 'print': return TokenType.PRINT;
-      case '+': case '-': case '*': case '/': return TokenType.OPERATOR;
-      case '(': case ')': return TokenType.PAREN;
-      case '=': return TokenType.ASSIGN;
-      default:
-        if (RegExp(r'^\d+$').hasMatch(value)) return TokenType.NUMBER;
-        if (RegExp(r'^[a-zA-Z_]\w*$').hasMatch(value)) return TokenType.IDENTIFIER;
-        throw FormatException('Unknown token: $value');
-    }
+
+  if (args['version'] as bool) {
+    print('MicroLang v$version');
+    return;
   }
-  
-  List<ASTNode> parser(List<Token> tokens) {
-    List<ASTNode> ast = [];
-    int i = 0;
-    
-    while (i < tokens.length) {
-      if (tokens[i].type == TokenType.PRINT) {
-        i++;
-        if (i >= tokens.length || tokens[i].type != TokenType.PAREN || tokens[i].value != '(') {
-          throw FormatException('Expected "(" after print');
-        }
-        i++;
-        if (i >= tokens.length || tokens[i].type != TokenType.IDENTIFIER) {
-          throw FormatException('Expected identifier after print(');
-        }
-        String identifier = tokens[i].value;
-        i++;
-        if (i >= tokens.length || tokens[i].type != TokenType.PAREN || tokens[i].value != ')') {
-          throw FormatException('Expected ")" after print(identifier');
-        }
-        ast.add(PrintNode(identifier));
-        i++;
-      } else if (tokens[i].type == TokenType.IDENTIFIER) {
-        String identifier = tokens[i].value;
-        i++;
-        if (i >= tokens.length || tokens[i].type != TokenType.ASSIGN) {
-          throw FormatException('Expected "=" after identifier');
-        }
-        i++;
-        if (i >= tokens.length || tokens[i].type != TokenType.NUMBER) {
-          throw FormatException('Expected number after identifier =');
-        }
-        int value = int.parse(tokens[i].value);
-        ast.add(AssignNode(identifier, value));
-        i++;
-      } else {
-        throw FormatException('Unexpected token: ${tokens[i].value}');
+
+  // Determine source code input
+  String sourceCode;
+  String? sourceFile;
+
+  if (args.rest.isNotEmpty) {
+    // Read from file
+    sourceFile = args.rest.first;
+    final file = File(sourceFile);
+    if (!file.existsSync()) {
+      stderr.writeln('Error: File not found: $sourceFile');
+      exit(1);
+    }
+    sourceCode = file.readAsStringSync();
+  } else {
+    // Interactive mode — read from stdin
+    print('MicroLang Compiler v$version');
+    print('Enter your code (type "END" on a new line to finish):');
+    print('');
+    List<String> lines = [];
+    while (true) {
+      String? line = stdin.readLineSync();
+      if (line == 'END') break;
+      if (line != null) lines.add(line);
+    }
+    sourceCode = lines.join('\n');
+  }
+
+  if (sourceCode.trim().isEmpty) {
+    stderr.writeln('Error: No source code provided.');
+    exit(1);
+  }
+
+  // Compile
+  final compiler = SimpleCompiler();
+  try {
+    final tokens = compiler.lexer(sourceCode);
+    if (args['tokens'] as bool) {
+      print('── Tokens ──');
+      for (var token in tokens) {
+        if (token.type != TokenType.EOF) print('  $token');
       }
+      print('');
     }
-    
-    return ast;
-  }
-  
-  String codeGenerator(List<ASTNode> ast) {
-    StringBuffer output = StringBuffer();
-    
-    for (var node in ast) {
-      if (node is PrintNode) {
-        output.writeln('console.log(${node.identifier});');
-      } else if (node is AssignNode) {
-        output.writeln('let ${node.identifier} = ${node.value};');
+
+    final ast = compiler.parser(tokens);
+    if (args['ast'] as bool) {
+      print('── AST ──');
+      for (var node in ast) {
+        print('  $node');
       }
+      print('');
     }
-    
-    return output.toString();
+
+    final output = compiler.codeGenerator(ast);
+
+    // Output
+    final outputPath = args['output'] as String?;
+    if (outputPath != null) {
+      File(outputPath).writeAsStringSync(output);
+      print('✓ Compiled ${sourceFile ?? 'input'} → $outputPath');
+    } else {
+      if (args['tokens'] as bool || args['ast'] as bool) {
+        print('── Generated JavaScript ──');
+      }
+      print(output);
+    }
+  } on FormatException catch (e) {
+    stderr.writeln('Compilation Error: ${e.message}');
+    exit(1);
+  } catch (e) {
+    stderr.writeln('Error: $e');
+    exit(1);
   }
 }
 
-enum TokenType { IF, ELSE, PRINT, NUMBER, IDENTIFIER, OPERATOR, PAREN, ASSIGN }
-
-class Token {
-  final TokenType type;
-  final String value;
-  
-  Token(this.type, this.value);
-  
-  @override
-  String toString() => 'Token($type, $value)';
-}
-
-abstract class ASTNode {}
-
-class PrintNode extends ASTNode {
-  final String identifier;
-  PrintNode(this.identifier);
-  
-  @override
-  String toString() => 'PrintNode($identifier)';
-}
-
-class AssignNode extends ASTNode {
-  final String identifier;
-  final int value;
-  AssignNode(this.identifier, this.value);
-  
-  @override
-  String toString() => 'AssignNode($identifier, $value)';
+void _printUsage(ArgParser parser) {
+  print('MicroLang Compiler v$version');
+  print('A minimalist language that compiles to JavaScript.\n');
+  print('Usage:');
+  print('  microlang [options] [file.ml]');
+  print('  microlang                     Interactive mode (type END to finish)');
+  print('  microlang program.ml          Compile a file');
+  print('  microlang program.ml -o out.js  Compile to a file');
+  print('');
+  print('Options:');
+  print(parser.usage);
+  print('');
+  print('Examples:');
+  print('  microlang hello.ml                  Print generated JS to stdout');
+  print('  microlang hello.ml -o hello.js      Write generated JS to hello.js');
+  print('  microlang hello.ml --tokens --ast   Show tokens and AST');
+  print('  microlang -v                        Show version');
 }
